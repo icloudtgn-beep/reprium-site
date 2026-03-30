@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders statistics: Статистика заказов </title>
+  <style>
+    :root {
+      --bg: #f6f3ee;
+      --panel: #fffdf9;
+      --ink: #1d2433;
+      --muted: #5d6472;
+      --grid: #d8d9dd;
+      --accent: #0f4c81;
+      --border: #d9d2c3;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(15, 76, 129, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(209, 73, 91, 0.12), transparent 22%),
+        linear-gradient(180deg, #f7f1e7 0%, var(--bg) 100%);
+    }
+    .page {
+      width: calc(100vw - 32px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 20px 0 24px;
+    }
+    .header {
+      margin-bottom: 18px;
+      padding: 0 8px;
+    }
+    .header h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 42px);
+      line-height: 1.05;
+      letter-spacing: 0.02em;
+    }
+    .header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 18px;
+      align-items: start;
+      min-height: calc(100vh - 128px);
+    }
+    .panel {
+      background: rgba(255, 253, 249, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: 0 18px 50px rgba(56, 43, 24, 0.08);
+      backdrop-filter: blur(8px);
+    }
+    .controls {
+      padding: 20px;
+      position: sticky;
+      top: 18px;
+    }
+    .controls h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+    .control-group {
+      margin-bottom: 20px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .control-group input[type="date"] {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--ink);
+      font-size: 15px;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      background: var(--accent);
+      transition: transform 0.18s ease, opacity 0.18s ease;
+    }
+    button.secondary {
+      background: #85745e;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+    }
+    .series-list {
+      display: grid;
+      gap: 10px;
+      max-height: 58vh;
+      overflow: auto;
+      padding-right: 6px;
+    }
+    .series-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #ece5d8;
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.75);
+    }
+    .series-item input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+    }
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+    .series-name {
+      font-size: 14px;
+      line-height: 1.25;
+    }
+    .chart-panel {
+      padding: 18px;
+      min-height: calc(100vh - 128px);
+      display: flex;
+      flex-direction: column;
+    }
+    .chart-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .chart-meta strong {
+      font-size: 18px;
+    }
+    .chart-meta span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .period-stats {
+      display: grid;
+      grid-template-columns: minmax(220px, 300px) 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .stat-card, .changes-card {
+      border: 1px solid #ebe4d7;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.78);
+      padding: 16px;
+    }
+    .stat-label {
+      margin: 0 0 6px;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .stat-value {
+      font-size: clamp(26px, 4vw, 36px);
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-value.up {
+      color: #1f7a4d;
+    }
+    .stat-value.down {
+      color: #b5443c;
+    }
+    .stat-value.flat {
+      color: #6b7280;
+    }
+    .stat-subtext {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .changes-card {
+      min-height: 102px;
+    }
+    .changes-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .changes-header strong {
+      font-size: 15px;
+    }
+    .changes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+    .change-pill {
+      border: 1px solid #ece5d8;
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: rgba(255, 253, 249, 0.9);
+    }
+    .change-pill-name {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      line-height: 1.25;
+    }
+    .change-pill-value {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .change-pill-value.up {
+      color: #1f7a4d;
+    }
+    .change-pill-value.down {
+      color: #b5443c;
+    }
+    .change-pill-value.flat {
+      color: #6b7280;
+    }
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      height: calc(100vh - 220px);
+      min-height: 520px;
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.95), rgba(252,248,241,0.95));
+      border: 1px solid #ebe4d7;
+      overflow: hidden;
+      flex: 1 1 auto;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 18px;
+      background: rgba(255, 253, 249, 0.88);
+    }
+    .tooltip {
+      position: absolute;
+      display: none;
+      min-width: 220px;
+      max-width: 320px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(217, 210, 195, 0.95);
+      background: rgba(255, 253, 249, 0.96);
+      box-shadow: 0 14px 40px rgba(56, 43, 24, 0.16);
+      pointer-events: none;
+      z-index: 3;
+    }
+    .tooltip-date {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .tooltip-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .tooltip-row {
+      display: grid;
+      grid-template-columns: 12px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+    }
+    .tooltip-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+    .tooltip-name {
+      color: var(--muted);
+      line-height: 1.2;
+    }
+    .tooltip-value {
+      font-weight: 700;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    @media (max-width: 980px) {
+      .page {
+        width: calc(100vw - 20px);
+        padding-top: 10px;
+      }
+      .layout {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+      .controls {
+        position: static;
+      }
+      .chart-panel {
+        min-height: auto;
+      }
+      .period-stats {
+        grid-template-columns: 1fr;
+      }
+      .series-list {
+        max-height: none;
+      }
+      .canvas-wrap {
+        height: 70vh;
+        min-height: 380px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>Orders statistics: Статистика заказов </h1>
+      <p>Интерактивный график по данным Excel: можно включать магазины по отдельности и фильтровать диапазон дат.</p>
+    </div>
+    <div class="layout">
+      <aside class="panel controls">
+        <h2>Фильтры</h2>
+        <div class="control-group">
+          <label for="date-from">Дата с</label>
+          <input id="date-from" type="date">
+        </div>
+        <div class="control-group">
+          <label for="date-to">Дата по</label>
+          <input id="date-to" type="date">
+        </div>
+        <div class="btn-row">
+          <button id="select-all" type="button">Выбрать все</button>
+          <button id="clear-all" class="secondary" type="button">Снять все</button>
+        </div>
+        <div class="control-group">
+          <label>Магазины</label>
+          <div id="series-list" class="series-list"></div>
+        </div>
+      </aside>
+      <section class="panel chart-panel">
+        <div class="chart-meta">
+          <div>
+            <strong>Динамика по магазинам</strong><br>
+            <span id="summary"></span>
+          </div>
+          <span id="range-label"></span>
+        </div>
+        <div class="period-stats">
+          <div class="stat-card">
+            <div class="stat-label">Суммарная динамика за период</div>
+            <div id="total-change" class="stat-value flat">0%</div>
+            <div id="total-change-details" class="stat-subtext">Выберите диапазон дат и магазины.</div>
+          </div>
+          <div class="changes-card">
+            <div class="changes-header">
+              <strong>Динамика по магазинам</strong>
+              <span id="changes-count"></span>
+            </div>
+            <div id="changes-grid" class="changes-grid"></div>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="chart"></canvas>
+          <div id="tooltip" class="tooltip"></div>
+          <div id="empty" class="empty">Нет данных для выбранного диапазона или ни один магазин не включён.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const dataset = {"title": "Orders statistics: Статистика заказов ", "dates": ["2026-02-01", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-07", "2026-02-08", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-14", "2026-02-15", "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-02-28", "2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-07", "2026-03-08", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-14", "2026-03-15", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-21", "2026-03-22", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-28", "2026-03-29"], "series": [{"name": "ИЕВЛЕВА МАВЕРИК", "color": "#0f4c81", "values": [37.0, 51.0, 83.0, 99.0, 112.0, 161.0, 181.0, 198.0, 120.0, 214.0, 199.0, 201.0, 195.0, 163.0, 184.0, 244.0, 276.0, 259.0, 245.0, 240.0, 229.0, 198.0, 169.0, 191.0, 239.0, 240.0, 244.0, 288.0, 326.0, 359.0, 497.0, 405.0, 354.0, 347.0, 317.0, 327.0, 489.0, 414.0, 383.0, 374.0, 352.0, 323.0, 337.0, 270.0, 239.0, 200.0, 189.0, 240.0, 218.0, 248.0, 171.0, 138.0, 147.0, 152.0, 164.0, 131.0, 108.0]}, {"name": "ГУНЕВИЧ NICE SMELL PARFUM", "color": "#d1495b", "values": [22.0, 17.0, 26.0, 33.0, 35.0, 45.0, 41.0, 37.0, 35.0, 29.0, 38.0, 34.0, 36.0, 39.0, 36.0, 37.0, 47.0, 42.0, 40.0, 34.0, 32.0, 26.0, 27.0, 35.0, 34.0, 41.0, 39.0, 34.0, 30.0, 26.0, 20.0, 22.0, 21.0, 20.0, 23.0, 26.0, 18.0, 31.0, 24.0, 29.0, 24.0, 24.0, 27.0, 20.0, 17.0, 17.0, 18.0, 21.0, 14.0, 22.0, 13.0, 30.0, 18.0, 12.0, 24.0, 13.0, 10.0]}, {"name": "ГУНЕВИЧ BAY AGAIN", "color": "#2e8b57", "values": [876.0, 600.0, 651.0, 677.0, 695.0, 690.0, 706.0, 709.0, 749.0, 764.0, 763.0, 794.0, 817.0, 829.0, 855.0, 850.0, 867.0, 917.0, 772.0, 758.0, 751.0, 699.0, 724.0, 704.0, 696.0, 717.0, 698.0, 767.0, 682.0, 660.0, 680.0, 633.0, 576.0, 531.0, 555.0, 528.0, 633.0, 579.0, 501.0, 495.0, 478.0, 574.0, 502.0, 477.0, 470.0, 460.0, 453.0, 444.0, 394.0, 433.0, 431.0, 386.0, 442.0, 406.0, 309.0, 339.0, 299.0]}, {"name": "НАТАШЕВ MIZ", "color": "#f77f00", "values": [41.0, 39.0, 35.0, 33.0, 32.0, 33.0, 34.0, 48.0, 39.0, 42.0, 49.0, 56.0, 46.0, 51.0, 53.0, 43.0, 36.0, 42.0, 41.0, 39.0, 28.0, 26.0, 24.0, 39.0, 34.0, 34.0, 36.0, 43.0, 39.0, 46.0, 47.0, 33.0, 34.0, 36.0, 43.0, 34.0, 41.0, 29.0, 34.0, 34.0, 29.0, 38.0, 29.0, 44.0, 34.0, 29.0, 29.0, 31.0, 30.0, 29.0, 44.0, 27.0, 34.0, 37.0, 25.0, 31.0, 22.0]}, {"name": "МУХАМЕДОВА VALERIA BEAUTY", "color": "#6a4c93", "values": [217.0, 120.0, 219.0, 178.0, 204.0, 260.0, 289.0, 389.0, 317.0, 367.0, 389.0, 346.0, 374.0, 322.0, 399.0, 376.0, 373.0, 399.0, 359.0, 382.0, 326.0, 374.0, 299.0, 443.0, 393.0, 517.0, 513.0, 331.0, 402.0, 365.0, 332.0, 280.0, 229.0, 277.0, 223.0, 284.0, 345.0, 362.0, 298.0, 346.0, 327.0, 362.0, 307.0, 243.0, 305.0, 319.0, 326.0, 270.0, 303.0, 212.0, 260.0, 316.0, 338.0, 336.0, 296.0, 215.0, 198.0]}, {"name": "MILOVA AROMATEA", "color": "#0077b6", "values": [42.0, 53.0, 75.0, 46.0, 80.0, 46.0, 54.0, 44.0, 68.0, 88.0, 110.0, 119.0, 88.0, 140.0, 110.0, 78.0, 128.0, 146.0, 169.0, 168.0, 156.0, 125.0, 94.0, 83.0, 144.0, 131.0, 124.0, 155.0, 140.0, 126.0, 155.0, 146.0, 143.0, 115.0, 100.0, 116.0, 123.0, 155.0, 174.0, 160.0, 184.0, 183.0, 167.0, 129.0, 138.0, 149.0, 159.0, 118.0, 144.0, 171.0, 142.0, 151.0, 147.0, 161.0, 188.0, 209.0, 197.0]}, {"name": "ЖИДЯЕВА VANILLA", "color": "#c1121f", "values": [188.0, 147.0, 168.0, 151.0, 189.0, 186.0, 152.0, 175.0, 158.0, 187.0, 194.0, 222.0, 184.0, 202.0, 213.0, 195.0, 207.0, 218.0, 194.0, 165.0, 190.0, 166.0, 210.0, 236.0, 269.0, 218.0, 279.0, 291.0, 284.0, 171.0, 203.0, 156.0, 159.0, 122.0, 132.0, 136.0, 139.0, 146.0, 144.0, 145.0, 155.0, 148.0, 136.0, 109.0, 95.0, 119.0, 117.0, 94.0, 105.0, 87.0, 82.0, 84.0, 84.0, 72.0, 85.0, 76.0, 65.0]}, {"name": "БАЧИНСКАЯ NIKA BEAUTY", "color": "#588157", "values": [353.0, 298.0, 333.0, 438.0, 396.0, 419.0, 386.0, 439.0, 494.0, 504.0, 498.0, 501.0, 582.0, 567.0, 659.0, 483.0, 469.0, 529.0, 532.0, 549.0, 451.0, 484.0, 410.0, 433.0, 563.0, 607.0, 596.0, 548.0, 572.0, 491.0, 547.0, 480.0, 443.0, 400.0, 389.0, 408.0, 399.0, 411.0, 386.0, 440.0, 444.0, 402.0, 394.0, 394.0, 379.0, 348.0, 360.0, 339.0, 363.0, 400.0, 450.0, 428.0, 392.0, 386.0, 369.0, 354.0, 339.0]}, {"name": "СЛЕСЬ AMAZING STORE", "color": "#bc6c25", "values": [142.0, 158.0, 213.0, 191.0, 172.0, 147.0, 143.0, 149.0, 146.0, 149.0, 150.0, 157.0, 189.0, 146.0, 209.0, 135.0, 133.0, 159.0, 145.0, 161.0, 131.0, 171.0, 145.0, 143.0, 203.0, 238.0, 262.0, 240.0, 255.0, 190.0, 179.0, 137.0, 139.0, 104.0, 125.0, 112.0, 157.0, 147.0, 132.0, 139.0, 101.0, 133.0, 126.0, 103.0, 121.0, 125.0, 116.0, 117.0, 94.0, 95.0, 111.0, 86.0, 107.0, 116.0, 92.0, 95.0, 108.0]}, {"name": "ГУНЕВИЧ PARFUME LAB", "color": "#4361ee", "values": [6.0, 8.0, 6.0, 2.0, 8.0, 9.0, 27.0, 64.0, 74.0, 74.0, 129.0, 48.0, 58.0, 69.0, 25.0, 22.0, 39.0, 26.0, 38.0, 43.0, 32.0, 36.0, 32.0, 92.0, 94.0, 129.0, 107.0, 116.0, 114.0, 80.0, 102.0, 95.0, 65.0, 66.0, 61.0, 66.0, 70.0, 67.0, 66.0, 55.0, 69.0, 50.0, 119.0, 113.0, 127.0, 104.0, 126.0, 104.0, 107.0, 109.0, 105.0, 91.0, 78.0, 77.0, 73.0, 63.0, 61.0]}, {"name": "ГУНЕВИЧ USE ME", "color": "#8338ec", "values": [241.0, 168.0, 177.0, 188.0, 212.0, 196.0, 243.0, 230.0, 222.0, 222.0, 279.0, 248.0, 280.0, 275.0, 321.0, 244.0, 215.0, 241.0, 228.0, 200.0, 229.0, 196.0, 198.0, 222.0, 239.0, 202.0, 292.0, 276.0, 259.0, 225.0, 275.0, 235.0, 228.0, 185.0, 238.0, 247.0, 260.0, 252.0, 218.0, 211.0, 199.0, 259.0, 244.0, 253.0, 226.0, 231.0, 202.0, 210.0, 179.0, 244.0, 167.0, 187.0, 181.0, 161.0, 152.0, 159.0, 160.0]}]};
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
+    const emptyState = document.getElementById("empty");
+    const tooltip = document.getElementById("tooltip");
+    const dateFromInput = document.getElementById("date-from");
+    const dateToInput = document.getElementById("date-to");
+    const seriesList = document.getElementById("series-list");
+    const summary = document.getElementById("summary");
+    const rangeLabel = document.getElementById("range-label");
+    const selectAllBtn = document.getElementById("select-all");
+    const clearAllBtn = document.getElementById("clear-all");
+    const totalChange = document.getElementById("total-change");
+    const totalChangeDetails = document.getElementById("total-change-details");
+    const changesGrid = document.getElementById("changes-grid");
+    const changesCount = document.getElementById("changes-count");
+
+    const state = {
+      activeNames: new Set(dataset.series.map(item => item.name)),
+      dateFrom: dataset.dates[0],
+      dateTo: dataset.dates[dataset.dates.length - 1],
+      hoverIndex: null,
+    };
+    let currentData = { dates: [], series: [] };
+    let currentLayout = null;
+
+    function formatDate(value) {
+      const [year, month, day] = value.split("-");
+      return `${day}.${month}.${year}`;
+    }
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
+    }
+
+    function formatPercent(value) {
+      return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+    }
+
+    function getChangeClass(value) {
+      if (value > 0) return "up";
+      if (value < 0) return "down";
+      return "flat";
+    }
+
+    function calculatePercentChange(startValue, endValue) {
+      if (startValue === 0 && endValue === 0) {
+        return 0;
+      }
+      if (startValue === 0) {
+        return null;
+      }
+      return ((endValue - startValue) / startValue) * 100;
+    }
+
+    function createSeriesControls() {
+      seriesList.innerHTML = "";
+      dataset.series.forEach(item => {
+        const row = document.createElement("label");
+        row.className = "series-item";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = state.activeNames.has(item.name);
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) {
+            state.activeNames.add(item.name);
+          } else {
+            state.activeNames.delete(item.name);
+          }
+          render();
+        });
+
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = item.color;
+
+        const name = document.createElement("span");
+        name.className = "series-name";
+        name.textContent = item.name;
+
+        row.append(checkbox, swatch, name);
+        seriesList.append(row);
+      });
+    }
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function getVisibleData() {
+      const start = state.dateFrom;
+      const end = state.dateTo;
+      const indices = [];
+      dataset.dates.forEach((date, index) => {
+        if (date >= start && date <= end) {
+          indices.push(index);
+        }
+      });
+
+      const visibleSeries = dataset.series.filter(item => state.activeNames.has(item.name));
+      const slicedSeries = visibleSeries.map(item => ({
+        ...item,
+        values: indices.map(index => item.values[index]),
+      }));
+
+      return {
+        dates: indices.map(index => dataset.dates[index]),
+        series: slicedSeries,
+      };
+    }
+
+    function updatePeriodStats(data) {
+      changesGrid.innerHTML = "";
+
+      if (!data.dates.length || !data.series.length) {
+        totalChange.textContent = "0%";
+        totalChange.className = "stat-value flat";
+        totalChangeDetails.textContent = "Нет данных для расчёта динамики.";
+        changesCount.textContent = "";
+        return;
+      }
+
+      const firstDayTotal = data.series.reduce((sum, item) => sum + (item.values[0] || 0), 0);
+      const lastDayTotal = data.series.reduce((sum, item) => sum + (item.values[item.values.length - 1] || 0), 0);
+      const totalDelta = calculatePercentChange(firstDayTotal, lastDayTotal);
+
+      if (totalDelta === null) {
+        totalChange.textContent = "н/д";
+        totalChange.className = "stat-value flat";
+      } else {
+        totalChange.textContent = formatPercent(totalDelta);
+        totalChange.className = `stat-value ${getChangeClass(totalDelta)}`;
+      }
+
+      totalChangeDetails.textContent =
+        `Сумма по активным магазинам: ${formatNumber(firstDayTotal)} -> ${formatNumber(lastDayTotal)}`;
+      changesCount.textContent = `Показано: ${data.series.length}`;
+
+      data.series.forEach(item => {
+        const startValue = item.values[0] || 0;
+        const endValue = item.values[item.values.length - 1] || 0;
+        const delta = calculatePercentChange(startValue, endValue);
+
+        const pill = document.createElement("div");
+        pill.className = "change-pill";
+
+        const name = document.createElement("div");
+        name.className = "change-pill-name";
+        name.textContent = item.name;
+
+        const value = document.createElement("div");
+        value.className = "change-pill-value";
+        if (delta === null) {
+          value.classList.add("flat");
+          value.textContent = "н/д";
+        } else {
+          value.classList.add(getChangeClass(delta));
+          value.textContent = formatPercent(delta);
+        }
+
+        const detail = document.createElement("div");
+        detail.className = "stat-subtext";
+        detail.textContent = `${formatNumber(startValue)} -> ${formatNumber(endValue)}`;
+
+        pill.append(name, value, detail);
+        changesGrid.append(pill);
+      });
+    }
+
+    function getChartLayout(width, height) {
+      const left = 72;
+      const top = 40;
+      const right = 280;
+      const bottom = 52;
+      return {
+        left,
+        top,
+        right,
+        bottom,
+        plotWidth: width - left - right,
+        plotHeight: height - top - bottom,
+      };
+    }
+
+    function drawGrid(width, height, left, top, right, bottom, yMax) {
+      const plotWidth = width - left - right;
+      const plotHeight = height - top - bottom;
+      const ticks = 6;
+
+      ctx.strokeStyle = "#ddd7cb";
+      ctx.fillStyle = "#5d6472";
+      ctx.lineWidth = 1;
+      ctx.font = "12px Trebuchet MS, sans-serif";
+
+      for (let i = 0; i <= ticks; i += 1) {
+        const value = (yMax / ticks) * i;
+        const y = top + plotHeight - (plotHeight * i) / ticks;
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(left + plotWidth, y);
+        ctx.stroke();
+        ctx.textAlign = "right";
+        ctx.fillText(formatNumber(value), left - 10, y + 4);
+      }
+
+      ctx.strokeStyle = "#e9e4da";
+      ctx.fillStyle = "#5d6472";
+      const xTicks = Math.min(8, dataset.dates.length);
+      for (let i = 0; i < xTicks; i += 1) {
+        const index = Math.round((data.dates.length - 1) * (i / Math.max(xTicks - 1, 1)));
+        const x = left + (plotWidth * index) / Math.max(data.dates.length - 1, 1);
+        ctx.beginPath();
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, top + plotHeight);
+        ctx.stroke();
+        ctx.textAlign = "center";
+        ctx.fillText(formatDate(data.dates[index]).slice(0, 5), x, top + plotHeight + 24);
+      }
+
+      ctx.strokeStyle = "#1d2433";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(left, top);
+      ctx.lineTo(left, top + plotHeight);
+      ctx.lineTo(left + plotWidth, top + plotHeight);
+      ctx.stroke();
+    }
+
+    function drawSeries(data, width, height, left, top, right, bottom, yMax) {
+      const plotWidth = width - left - right;
+      const plotHeight = height - top - bottom;
+
+      data.series.forEach(item => {
+        ctx.beginPath();
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = 2.5;
+        item.values.forEach((value, index) => {
+          const x = left + (plotWidth * index) / Math.max(data.dates.length - 1, 1);
+          const y = top + plotHeight - (value / yMax) * plotHeight;
+          if (index === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+      });
+    }
+
+    function drawLegend(data, width) {
+      const startX = width - 255;
+      const startY = 28;
+      ctx.font = "13px Trebuchet MS, sans-serif";
+      ctx.textAlign = "left";
+      data.series.forEach((item, index) => {
+        const y = startY + index * 22;
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(startX, y);
+        ctx.lineTo(startX + 22, y);
+        ctx.stroke();
+        ctx.fillStyle = "#1d2433";
+        ctx.fillText(item.name, startX + 30, y + 4);
+      });
+    }
+
+    function drawHoverOverlay(data, layout, yMax) {
+      if (state.hoverIndex === null || state.hoverIndex < 0 || state.hoverIndex >= data.dates.length) {
+        tooltip.style.display = "none";
+        return;
+      }
+
+      const x = layout.left + (layout.plotWidth * state.hoverIndex) / Math.max(data.dates.length - 1, 1);
+      ctx.save();
+      ctx.strokeStyle = "rgba(29, 36, 51, 0.28)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(x, layout.top);
+      ctx.lineTo(x, layout.top + layout.plotHeight);
+      ctx.stroke();
+      ctx.restore();
+
+      data.series.forEach(item => {
+        const value = item.values[state.hoverIndex];
+        const y = layout.top + layout.plotHeight - (value / yMax) * layout.plotHeight;
+        ctx.beginPath();
+        ctx.fillStyle = item.color;
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.fillStyle = "#ffffff";
+        ctx.arc(x, y, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      const rows = data.series
+        .map(item => {
+          const value = item.values[state.hoverIndex];
+          return `
+            <div class="tooltip-row">
+              <span class="tooltip-dot" style="background:${item.color}"></span>
+              <span class="tooltip-name">${item.name}</span>
+              <span class="tooltip-value">${formatNumber(value)}</span>
+            </div>
+          `;
+        })
+        .join("");
+
+      tooltip.innerHTML = `
+        <div class="tooltip-date">${formatDate(data.dates[state.hoverIndex])}</div>
+        <div class="tooltip-grid">${rows}</div>
+      `;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const tooltipWidth = Math.min(320, Math.max(220, tooltip.offsetWidth || 220));
+      let tooltipLeft = x + 16;
+      if (tooltipLeft + tooltipWidth > canvasRect.width - 12) {
+        tooltipLeft = x - tooltipWidth - 16;
+      }
+      tooltipLeft = Math.max(12, tooltipLeft);
+      tooltip.style.left = `${tooltipLeft}px`;
+      tooltip.style.top = "14px";
+      tooltip.style.display = "block";
+    }
+
+    function updateHoverFromEvent(event) {
+      if (!currentData.dates.length || !currentLayout) {
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const plotRight = currentLayout.left + currentLayout.plotWidth;
+      const plotBottom = currentLayout.top + currentLayout.plotHeight;
+
+      if (x < currentLayout.left || x > plotRight || y < currentLayout.top || y > plotBottom) {
+        state.hoverIndex = null;
+        tooltip.style.display = "none";
+        render();
+        return;
+      }
+
+      const ratio = currentData.dates.length === 1
+        ? 0
+        : (x - currentLayout.left) / currentLayout.plotWidth;
+      const nextIndex = Math.round(ratio * (currentData.dates.length - 1));
+      if (state.hoverIndex !== nextIndex) {
+        state.hoverIndex = nextIndex;
+        render();
+      }
+    }
+
+    function render() {
+      window.data = getVisibleData();
+      currentData = data;
+      const activeCount = data.series.length;
+      summary.textContent = `Активно магазинов: ${activeCount} из ${dataset.series.length}`;
+      rangeLabel.textContent = `${formatDate(state.dateFrom)} - ${formatDate(state.dateTo)}`;
+      updatePeriodStats(data);
+
+      if (!data.dates.length || !activeCount) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        emptyState.style.display = "flex";
+        tooltip.style.display = "none";
+        return;
+      }
+
+      emptyState.style.display = "none";
+      resizeCanvas();
+
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const layout = getChartLayout(width, height);
+      currentLayout = layout;
+
+      ctx.clearRect(0, 0, width, height);
+
+      const maxValue = Math.max(...data.series.flatMap(item => item.values));
+      const yMax = Math.max(1, Math.pow(10, Math.floor(Math.log10(maxValue || 1))));
+      const normalizedYMax = maxValue <= yMax ? yMax : (maxValue <= yMax * 2 ? yMax * 2 : (maxValue <= yMax * 5 ? yMax * 5 : yMax * 10));
+
+      drawGrid(width, height, layout.left, layout.top, layout.right, layout.bottom, normalizedYMax);
+      drawSeries(data, width, height, layout.left, layout.top, layout.right, layout.bottom, normalizedYMax);
+      drawLegend(data, width);
+      drawHoverOverlay(data, layout, normalizedYMax);
+    }
+
+    dateFromInput.value = state.dateFrom;
+    dateToInput.value = state.dateTo;
+    dateFromInput.min = dataset.dates[0];
+    dateFromInput.max = dataset.dates[dataset.dates.length - 1];
+    dateToInput.min = dataset.dates[0];
+    dateToInput.max = dataset.dates[dataset.dates.length - 1];
+
+    dateFromInput.addEventListener("change", () => {
+      if (dateFromInput.value > state.dateTo) {
+        dateFromInput.value = state.dateTo;
+      }
+      state.dateFrom = dateFromInput.value;
+      render();
+    });
+
+    dateToInput.addEventListener("change", () => {
+      if (dateToInput.value < state.dateFrom) {
+        dateToInput.value = state.dateFrom;
+      }
+      state.dateTo = dateToInput.value;
+      render();
+    });
+
+    selectAllBtn.addEventListener("click", () => {
+      state.activeNames = new Set(dataset.series.map(item => item.name));
+      createSeriesControls();
+      render();
+    });
+
+    clearAllBtn.addEventListener("click", () => {
+      state.activeNames = new Set();
+      createSeriesControls();
+      render();
+    });
+
+    canvas.addEventListener("mousemove", updateHoverFromEvent);
+    canvas.addEventListener("mouseleave", () => {
+      state.hoverIndex = null;
+      tooltip.style.display = "none";
+      render();
+    });
+    window.addEventListener("resize", render);
+
+    createSeriesControls();
+    resizeCanvas();
+    render();
+  </script>
+</body>
+</html>
